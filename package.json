@@ -1,0 +1,22 @@
+{
+  "name": "research_and_customlibrary",
+  "version": "1.0.0",
+  "description": "This is the custom library for upload image and pdf files in cloud buckets.",
+  "main": "app.js",
+  "scripts": {
+    "start": "nodemon app.js"
+  },
+  "keywords": [],
+  "author": "Dinesh Ranjan Biswal",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "minio": "^8.0.1",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

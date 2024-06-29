@@ -1,9 +1,7 @@
 const multer=require("multer");
 const path=require("path");
-const { Constants } = require("../utils/constant");
 const { v4: uuidv4 } = require("uuid");
-const minioClient = require('../utils/minioClient');
-const config = require('../config/config');
+const config = require('./config/config');
 const chosenConfig = config.minioClient;
 
 
@@ -36,14 +34,14 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
                 if(error instanceof multer.MulterError){
                     switch(error.code){
                         case "LIMIT_FILE_SIZE":
-                            throw new Error({"statusCode":Constants.HTTPBADREQUEST,"status":Constants.failedStatus,"message":"File size exceeds the limit."});
+                            throw new Error({"statusCode":400,"status":false,"message":"File size exceeds the limit."});
                         case "LIMIT_UNSUPPORTED_FILE_TYPE":
-                            throw  new Error({"statusCode":Constants.HTTPBADREQUEST,"status":Constants.failedStatus,"message":"Invalid file type. Only images (.jpg, .jpeg, .png) and PDFs (.pdf) are allowed."});
+                            throw  new Error({"statusCode":400,"status":false,"message":"Invalid file type. Only images (.jpg, .jpeg, .png) and PDFs (.pdf) are allowed."});
                         default:
-                            throw new Error({"statusCode":Constants.HTTPINTERNALSERVERERROR,"status":Constants.failedStatus,"message":"File upload error"});  
+                            throw new Error({"statusCode":500,"status":false,"message":"File upload error"});  
                     }
                 }else if(error){
-                    throw  new Error({"statusCode":Constants.HTTPINTERNALSERVERERROR,"status":Constants.failedStatus,"message":"Unknown error"});
+                    throw  new Error({"statusCode":500,"status":false,"message":"Unknown error"});
                 }
 
                 //? receiving the file/files after uploading the image/ images     
@@ -53,7 +51,7 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
 
                 let missingFields = [];
                 if(Object.keys(files).length===0){
-                    return res.status(Constants.HTTPBADREQUEST).json({"statusCode":Constants.HTTPBADREQUEST,"status":Constants.failedStatus,"message": `No files provided`});
+                    return res.status(400).json({"statusCode":400,"status":false,"message": `No files provided`});
                 }
                 if(Object.keys(files).length!==0){
                     console.log(Object.keys(files))
@@ -63,7 +61,7 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
                         }
                     });
                     if(missingFields.length>0){
-                        return res.status(Constants.HTTPBADREQUEST).json({"statusCode":Constants.HTTPBADREQUEST,"status":Constants.failedStatus,"message":`Empty fields :${missingFields.join(", ")}`});
+                        return res.status(400).json({"statusCode":400,"status":false,"message":`Empty fields :${missingFields.join(", ")}`});
                     }
                 }
 
@@ -75,17 +73,17 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
 
                     //? check the file/ files present or not or null or it's length is equals to zero then handle here
                     if(files.length>maxCount){
-                        return res.status(Constants.HTTPBADREQUEST).json({"statusCode":Constants.HTTPBADREQUEST,"status":Constants.failedStatus,"message":`Maximum ${maxCount} files allowed in ${fieldName}`});
+                        return res.status(400).json({"statusCode":400,"status":false,"message":`Maximum ${maxCount} files allowed in ${fieldName}`});
                     }
                     console.log(uploadedFiles);
                     await Promise.all(files.map(async(file)=>{
                         const uniqueFileName=`${uuidv4()}_${file.originalname.replace(/\s+/g, '_')}`;
                         const metaData={'Content-type':file.mimetype};
-                        await minioClient.putObject(chosenConfig.BUCKET_NAME, `${folderName}/${fieldName}/${uniqueFileName}`, file.buffer, metaData).then(()=>{
+                        await chosenConfig.putObject(chosenConfig.BUCKET_NAME, `${folderName}/${fieldName}/${uniqueFileName}`, file.buffer, metaData).then(()=>{
                             uploadedFiles[fieldName].push(uniqueFileName);
                         }).catch((error)=>{
                             console.log(error);
-                            throw new Error({"statusCode":Constants.HTTPINTERNALSERVERERROR,"status":Constants.failedStatus,"message":error.message});
+                            throw new Error({"statusCode":500,"status":false,"message":error.message});
                         });
                     }));    
                 }));            
