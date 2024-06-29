@@ -14,3 +14,4 @@ const createUserDetails=async (req,res)=>{
         },
     })
 }
+module.exports=createUserDetails;
