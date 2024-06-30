@@ -21,7 +21,7 @@ module.exports = {
         MAIL_USERNAME: "watercorporationofodisha0@gmail.com",
         MAIL_PASSWORD: "oqnr prlm ldre tyvf",
     },
-    minioClient: {
+    cloudBucketConfig: {
         endPoint: '62.72.31.234',
         port: 9000,
         useSSL: false,
@@ -38,7 +38,7 @@ module.exports = {
 
 /*
     if .env file setup then do this way....
-    
+
     MINIO_END_POINT=your_minio_endpoint
     MINIO_PORT=9000
     MINIO_USE_SSL=false

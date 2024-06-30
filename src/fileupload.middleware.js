@@ -1,19 +1,18 @@
 const multer=require("multer");
-const Minio = require('minio');
+
 const path=require("path");
 const fs=require('fs');
 const { v4: uuidv4 } = require("uuid");
 const config = require('./config/config');
-const minio = config.minioClient;
 const fileUploadConfig=config.fileUploadSettings;
 
-const minioClient= new Minio.Client(minio);
 
-
-
+let bucketClient;
+let bucketConfig;
+let uploadFunction;
 
 //? find the package.json into project folders
-const findPackageJson=(function (startDir){
+const findPackageJsonPath=(function (startDir){
     let currentDir=startDir;
     while(true){
         const packagePath=path.join(currentDir,'package.json');
@@ -30,7 +29,26 @@ const findPackageJson=(function (startDir){
     }
 })(process.cwd());
 
-console.log("path of package.json file ",findPackageJson);
+//? read the package.json file
+const packageJson= JSON.parse(fs.readFileSync(findPackageJsonPath,'utf8'));
+
+console.log("package json ",packageJson);
+
+//? check the dependencies and find then minio dependency and setup the minio
+if(packageJson.dependencies['minio']){
+    const Minio = require('minio')
+    bucketConfig = config.cloudBucketConfig;
+    bucketClient = new Minio.Client(bucketConfig);
+    uploadFunction= async(bucketName,folderName,fieldName,file,metaData)=>{
+        const uniqueFileName=`${uuidv4()}_${file.originalname.replace(/\s+/g, '_')}`;
+       try {
+         await bucketClient.putObject(bucketName,`${folderName}/${fieldName}/${uniqueFileName}`, file.buffer, metaData);
+       } catch (error) {
+         return res.status(500).json({"statusCode":500,"status":false,"message":error.message});
+       }
+       return uniqueFileName;
+    }
+}
 
 
 
@@ -55,7 +73,6 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
     }).fields(fieldNameDetails.map((field)=>({name:field.name})));
     console.log("upload ",upload);
     return async (req,res,next)=>{
-        //console.log("fieldNameDetails ",fieldNameDetails[1].name.length);
            //? fileupload function 
              upload(req,res,async (error)=>{
                 //? if the error is the instance of multer error then handle the error here
@@ -109,16 +126,17 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
                         }
                         console.log(uploadedFiles);
                         await Promise.all(files.map(async(file)=>{
-                            const uniqueFileName=`${uuidv4()}_${file.originalname.replace(/\s+/g, '_')}`;
                             const metaData={'Content-type':file.mimetype};
-                            await minioClient.putObject(minio.bucketName,`${folderName}/${fieldName}/${uniqueFileName}`, file.buffer, metaData).then(()=>{
-                                uploadedFiles[fieldName].push(uniqueFileName);
-                            }).catch((error)=>{
-                                uploadedFiles={};
+                            const uniqueFileName=await uploadFunction(bucketConfig.bucketName,folderName,fieldName,file,metaData);
+                            uploadedFiles[fieldName].push(uniqueFileName);
+                            // await minioClient.putObject(minio.bucketName,`${folderName}/${fieldName}/${uniqueFileName}`, file.buffer, metaData).then(()=>{
+                            //     uploadedFiles[fieldName].push(uniqueFileName);
+                            // }).catch((error)=>{
+                            //     uploadedFiles={};
     
-                                console.log(error);
-                                throw new Error({"statusCode":500,"status":false,"message":error.message});
-                            });
+                            //     console.log(error);
+                            //     throw new Error({"statusCode":500,"status":false,"message":error.message});
+                            // });
                         }));    
                     }));            
                     //? adding the uploadedFilesOne and uploadedFilesTwo array of object into the request object for next task
@@ -130,7 +148,7 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
                     }   
                 } catch (error) {
                     await Promise.all(Object.entries(uploadedFiles).forEach(async([fieldName,fileName])=>{
-                        await minioClient.removeObject(minio.bucketName,`${folderName}/${fieldName}/${fileName}`).catch((error)=>{
+                        await bucketClient.removeObject(bucketConfig.bucketName,`${folderName}/${fieldName}/${fileName}`).catch((error)=>{
                             throw new Error({"statusCode":500,"status":false,"message":error.message});
                         })
                     }));
