@@ -73,8 +73,10 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
     }).fields(fieldNameDetails.map((field)=>({name:field.name})));
     console.log("upload ",upload);
     return async (req,res,next)=>{
+
            //? fileupload function 
              upload(req,res,async (error)=>{
+
                 //? if the error is the instance of multer error then handle the error here
                 if(error instanceof multer.MulterError){
                     switch(error.code){
@@ -91,15 +93,20 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
 
                 //? receiving the file/files after uploading the image/ images   
                 let uploadedFiles={};
+
+                //? for missing fields for showing the error message to the response
                 let missingFields = [];  
                 try {
                     const files=req?.files;
                     console.log("files ",files);
                     
+                    //? for checking the file present or not  or the file length is greater than 0 or equals to 0
                     if(!files || Object.keys(files).length===0){
                         uploadedFiles={};
                         return res.status(400).json({"statusCode":400,"status":false,"message": `No files provided`});
                     }
+
+                    //? for checking the each field if there is any field value is missing or not 
                     if(Object.keys(files).length!==0){
                         console.log(Object.keys(files))
                         fieldNameDetails.forEach((field)=>{
@@ -107,6 +114,8 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
                                 missingFields.push(field.name);
                             }
                         });
+
+                        //? show the error messages in the response object...
                         if(missingFields.length>0){
                             uploadedFiles={};
                             return res.status(400).json({"statusCode":400,"status":false,"message":`Empty fields :${missingFields.join(", ")}`});
@@ -125,6 +134,7 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
                             return res.status(400).json({"statusCode":400,"status":false,"message":`Maximum ${maxCount} files allowed in ${fieldName}`});
                         }
                         console.log(uploadedFiles);
+                        //? call the upload function to upload the file or files of each field
                         await Promise.all(files.map(async(file)=>{
                             const metaData={'Content-type':file.mimetype};
                             const uniqueFileName=await uploadFunction(bucketConfig.bucketName,folderName,fieldName,file,metaData);
@@ -138,7 +148,8 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
                             //     throw new Error({"statusCode":500,"status":false,"message":error.message});
                             // });
                         }));    
-                    }));            
+                    }));      
+
                     //? adding the uploadedFilesOne and uploadedFilesTwo array of object into the request object for next task
                     if(Object.keys(uploadedFiles).length>0){
                         console.log("enterrrrr into if block...",uploadedFiles,Object.keys(uploadedFiles).length > 0);
@@ -147,6 +158,8 @@ const fileupload=(folderName,fieldNameDetails=[{name:"image",maxCount:10}])=>{
                         next();
                     }   
                 } catch (error) {
+
+                    //? if there is 
                     await Promise.all(Object.entries(uploadedFiles).forEach(async([fieldName,fileName])=>{
                         await bucketClient.removeObject(bucketConfig.bucketName,`${folderName}/${fieldName}/${fileName}`).catch((error)=>{
                             throw new Error({"statusCode":500,"status":false,"message":error.message});
