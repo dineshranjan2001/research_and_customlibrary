@@ -1,6 +1,6 @@
 const createUserDetails=async (req,res)=>{
     const {name, phoneNumber,email, password}=req.body;
-    const imageName=req.uploadedFiles.image;
+    //const imageName=req.uploadedFiles.image;
 
     res.status(201).json({
         statusCode:201,
@@ -9,7 +9,7 @@ const createUserDetails=async (req,res)=>{
             name,
             email,
             phoneNumber,
-            imageName,
+            //imageName,
             password
         },
     })
