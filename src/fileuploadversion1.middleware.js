@@ -52,7 +52,7 @@ if(packageJson.dependencies['minio']){
 // end of check the dependencies and find then minio dependency and setup the minio and upload the file
 
 // file upload function
-const fileupload=(fieldNameDetails=[{name:"image",maxCount:10,folderName:"image",isOptional:false}])=>{
+const fileupload=(fieldNameDetails=[{name:"image",maxCount:10,folderName:"images",isOptional:false}])=>{
     console.log(fieldNameDetails);
 
     // use the memory storage to store the image for temporary periods of time
@@ -103,31 +103,54 @@ const fileupload=(fieldNameDetails=[{name:"image",maxCount:10,folderName:"image"
             try {
                 const files=req?.files;
                 // for checking the file present or not  or the file length is greater than 0 or equals to 0
-                if(!files || Object.keys(files).length===0){
-                    //uploadedFiles={};
-                    const missingOptionalFields = fieldNameDetails.filter(field => !field.isOptional && !files[field.name]);
-                    if (missingOptionalFields.length > 0) {
-                        return res.status(400).json({
+                console.log("files ",files);
+
+                const missingFields=fieldNameDetails.reduce((acc,field)=>{
+                    //const filesForField = req.files?.[field.name];
+                    
+                    console.log("body ",req.body[field.name])
+                    if(!field.isOptional){
+                        if(req.body[field.name]!==undefined && !files?.[field.name]){
+                            console.log("enennennenene")
+                            acc.nofileprovided.push(field.name);
+                        }else{
+                            console.log("enrrr r r r r r r")
+                            acc.required.push(field.name);
+                        }
+                    }
+                    return acc;
+                },{required: [], nofileprovided: [],exceedSizeFields:[]});
+
+                if(missingFields.required.length>0 || missingFields.nofileprovided.length>0){
+                    let message = '';
+                    if (missingFields.required.length > 0) {
+                        message += `Required fields missing: ${missingFields.required.join(', ')}`;
+                    }
+                    if(missingFields.exceedSizeFields.length>0){
+                        message +=`Maximum files reached for ${exceedSizeFields.join(", ")}`;
+                    }
+                    if (missingFields.nofileprovided.length > 0) {
+                        message += (message ? ', ' : '') + `No files were provided for the fields: ${missingFields.nofileprovided.join(', ')}`;
+                    }
+                    
+                    return res.status(400).json({
                         statusCode: 400,
                         status: false,
-                        message: `Missing required files: ${missingOptionalFields.map(field => field.name).join(', ')}`
-                        });
-                    }else{
-                        next();
-                    }
-                    // else{
-                    //     return res.status(400).json({"statusCode":400,"status":false,"message": `No files provided`});
-                    // }
-                    
+                        message
+                      });
                 }
+
                 //end of for checking the file present or not  or the file length is greater than 0 or equals to 0
 
                 // for checking the each field if there is any field value is missing or not 
-                if(Object.keys(files).length!==0){
+                if(Object.keys(files).length===0){
                     console.log(Object.keys(files))
                     fieldNameDetails.forEach((field)=>{
-                        if(!Object.keys(files).includes(field.name)){
-                            missingFields.push(field.name);
+                        const missingOptionalFields = fieldNameDetails.filter(field => !field.isOptional && !files[field.name]);
+                        if(missingOptionalFields.length>0){
+                            if(!Object.keys(files).includes(field.name)){
+                                missingFields.push(field.name);
+                            }
                         }
                     });
 
@@ -140,7 +163,7 @@ const fileupload=(fieldNameDetails=[{name:"image",maxCount:10,folderName:"image"
                 }
                 // end of for checking the each field if there is any field value is missing or not 
 
-                // for checking each fields maxSize if it is exceeds or not and show the error messages.
+                //for checking each fields maxSize if it is exceeds or not and show the error messages.
                 await Promise.all(Object.entries(files).map(async ([fieldName,files])=>{
                     const fieldDetails = fieldNameDetails.find((fieldNameDetails) => fieldNameDetails.name === fieldName);
                     const maxCount=fieldDetails?.maxCount;
@@ -148,9 +171,10 @@ const fileupload=(fieldNameDetails=[{name:"image",maxCount:10,folderName:"image"
                         exceedSizeFields.push(fieldDetails.name);
                     }
                 })); 
-                if((Object.keys(exceedSizeFields).length>0)){
-                    return res.status(400).json({"statusCode":400,"status":false,"message":`Maximum files reached for ${exceedSizeFields.join(", ")}`});
-                }else{
+                console.log("exceedSizeFields ", exceedSizeFields);
+
+                if(exceedSizeFields.length===0){
+                    console.log("enterrrrrrrrrrrrrrrrrrrrrrrrr");
                     await Promise.all(Object.entries(files).map(async ([fieldName,files])=>{
                         const fieldDetails = fieldNameDetails.find((f) => f.name === fieldName);
                         uploadedFiles[`${fieldName}`]=[];
@@ -175,18 +199,21 @@ const fileupload=(fieldNameDetails=[{name:"image",maxCount:10,folderName:"image"
                         next();
                     }
                      // end of adding the uploadedFiles array of object into the request object for next task or controller
+                }else{
+                    console.log("enter into exceedSize else block ");
+                    return res.status(400).json({"statusCode":400,"status":false,"message":`Maximum files reached for ${exceedSizeFields.join(", ")}`});
                 }
                 // end of for checking each fields maxSize if it is exceeds or not and show the error messages.
 
 
             } catch (error) {
-
+                console.log(error);
                 // if there is any error then delete the recent uploaded file into the minio 
-                await Promise.all(Object.entries(uploadedFiles).forEach(async([fieldName,fileName])=>{
-                    await bucketClient.removeObject(bucketConfig.bucketName,`${fieldName}/${fileName}`).catch((error)=>{
-                        return res.status(500).json({"statusCode":400,"status":false,"message":error.message});
-                    })
-                }));
+                // await Promise.all(Object.entries(uploadedFiles).forEach(async([fieldName,fileName])=>{
+                //     await bucketClient.removeObject(bucketConfig.bucketName,`${fieldName}/${fileName}`).catch((error)=>{
+                //         return res.status(500).json({"statusCode":400,"status":false,"message":error.message});
+                //     })
+                // }));
                 //end of if there is any error then delete the recent uploaded file into the minio 
             }
         })        
