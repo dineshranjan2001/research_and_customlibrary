@@ -94,9 +94,6 @@ const fileupload=(fieldNameDetails=[{name:"image",maxCount:10,folderName:"images
             // receiving the file/files after uploading the image/ images   
             let uploadedFiles={};
 
-            // for missing fields for showing the error message to the response
-            let missingFields = []; 
-
             // for exceedSize fields for showing the error message to the response
             let exceedSizeFields=[]; 
 
@@ -105,63 +102,37 @@ const fileupload=(fieldNameDetails=[{name:"image",maxCount:10,folderName:"images
                 // for checking the file present or not  or the file length is greater than 0 or equals to 0
                 console.log("files ",files);
 
-                const missingFields=fieldNameDetails.reduce((acc,field)=>{
-                    //const filesForField = req.files?.[field.name];
-                    
-                    console.log("body ",req.body[field.name])
+                const missingRequiredFields=fieldNameDetails.filter(field=>{
                     if(!field.isOptional){
-                        if(req.body[field.name]!==undefined && !files?.[field.name]){
-                            console.log("enennennenene")
-                            acc.nofileprovided.push(field.name);
-                        }else{
-                            console.log("enrrr r r r r r r")
-                            acc.required.push(field.name);
+                        console.log(req.body[field.name]);
+                        if(req.body[field.name]===undefined && (!req.files || !req.files[field.name])){
+                            console.log("fdfdfdfdfdfdddfdfdfdfdddf");
+                           return field;
                         }
                     }
-                    return acc;
-                },{required: [], nofileprovided: [],exceedSizeFields:[]});
-
-                if(missingFields.required.length>0 || missingFields.nofileprovided.length>0){
-                    let message = '';
-                    if (missingFields.required.length > 0) {
-                        message += `Required fields missing: ${missingFields.required.join(', ')}`;
-                    }
-                    if(missingFields.exceedSizeFields.length>0){
-                        message +=`Maximum files reached for ${exceedSizeFields.join(", ")}`;
-                    }
-                    if (missingFields.nofileprovided.length > 0) {
-                        message += (message ? ', ' : '') + `No files were provided for the fields: ${missingFields.nofileprovided.join(', ')}`;
-                    }
-                    
+                });
+                const nofileprovidedFields=fieldNameDetails.filter(field=>!field.isOptional && (req.body[field.name]!==undefined && !files?.[field.name]));
+         
+                console.log("missingRequiredFields ",missingRequiredFields);
+                console.log("nofileprovidedFields ",nofileprovidedFields);
+                if(missingRequiredFields.length>0){
+                    const missingFieldNames = missingRequiredFields.map(field => field.name).join(', ');
+                    return res.status(400).json({
+                                statusCode: 400,
+                                status: false,
+                                message:`Required fields missing: ${missingFieldNames}`
+                        });
+                }
+                if(nofileprovidedFields.length>0){
+                    const nofileProvidedFieldNames = nofileprovidedFields.map(field => field.name).join(', ');
                     return res.status(400).json({
                         statusCode: 400,
                         status: false,
-                        message
-                      });
+                        message:`No files were provided for the fields: ${nofileProvidedFieldNames}`
+                    });
                 }
 
                 //end of for checking the file present or not  or the file length is greater than 0 or equals to 0
-
-                // for checking the each field if there is any field value is missing or not 
-                if(Object.keys(files).length===0){
-                    console.log(Object.keys(files))
-                    fieldNameDetails.forEach((field)=>{
-                        const missingOptionalFields = fieldNameDetails.filter(field => !field.isOptional && !files[field.name]);
-                        if(missingOptionalFields.length>0){
-                            if(!Object.keys(files).includes(field.name)){
-                                missingFields.push(field.name);
-                            }
-                        }
-                    });
-
-                    // show the error messages in the response object...
-                    if(missingFields.length>0){
-                       // uploadedFiles={};
-                        return res.status(400).json({"statusCode":400,"status":false,"message":`Empty fields :${missingFields.join(", ")}`});
-                    }
-                    // end of show the error messages in the response object...
-                }
-                // end of for checking the each field if there is any field value is missing or not 
 
                 //for checking each fields maxSize if it is exceeds or not and show the error messages.
                 await Promise.all(Object.entries(files).map(async ([fieldName,files])=>{
@@ -181,13 +152,21 @@ const fileupload=(fieldNameDetails=[{name:"image",maxCount:10,folderName:"images
 
                         console.log(uploadedFiles);
                         // check the field is optional or not then call the upload function to upload the file or files of each field
-                        if(fieldDetails.isOptional===false){
+                        if(fieldDetails.isOptional===false && !files){
                             await Promise.all(files.map(async(file)=>{
+                                console.log("Enterrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr");
                                 const metaData={'Content-type':file.mimetype};
                                 const uniqueFileName=await uploadFunction(bucketConfig.bucketName,fieldDetails.folderName,file,metaData);
                                 uploadedFiles[fieldName].push(uniqueFileName);
                             })); 
-                        }   
+                        }else if(fieldDetails.isOptional===true && files){
+                            console.log("sdsdsdsdsdsdsdsdsdsdsdsd");
+                            await Promise.all(files.map(async(file)=>{
+                                const metaData={'Content-type':file.mimetype};
+                                const uniqueFileName=await uploadFunction(bucketConfig.bucketName,fieldDetails.folderName,file,metaData);
+                                uploadedFiles[fieldName].push(uniqueFileName);
+                            }));
+                        } 
                         // end of check the field is optional or not then call the upload function to upload the file or files of each field
                     }));
 
